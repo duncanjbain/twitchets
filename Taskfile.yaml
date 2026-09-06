@@ -1,20 +1,55 @@
 # Docs: https://taskfile.dev/#/usage
 version: "3"
 
+env:
+  DEBUG: true
+
 tasks:
   format:
+    - task: format:be
+    - task: format:fe
+
+  format:be:
     cmds:
       - go tool gofumpt -l -w .
 
-  lint:
+  format:fe:
+    dir: frontend
     cmds:
-      - go tool golangci-lint run . --fix
+      - pnpm run format
+
+  lint:be:
+    cmds:
+      - go tool golangci-lint run --fix ./...
+
+  lint:
+    - task: lint:be
+    - task: lint:fe
+
+  lint:fe:
+    dir: frontend
+    cmds:
+      - pnpm run lint
 
   generate:
     aliases:
       - gen
     cmds:
+      - task: generate:be
+      - task: generate:fe
+
+  generate:be:
+    aliases:
+      - gen:be
+    cmds:
       - go generate ./...
+
+  generate:fe:
+    dir: frontend
+    aliases:
+      - gen:fe
+    cmds:
+      - pnpm run generate
 
   test:
     cmds:
@@ -26,22 +61,31 @@ tasks:
       - task: test
 
   build:
+    - task: build:fe
+    - task: build:be
+
+  build:be:
     cmds:
       - go build -v -o ./bin/ .
 
-  build:docker:
+  build:fe:
+    dir: frontend
     cmds:
-      - docker build . -t arranhs/twitchets
+      - pnpm run build
 
-  run:
+  run:be:
     cmds:
       - go run .
 
-  run:docker:
-    deps: [build:docker]
+  run:fe:
+    dir: frontend
     cmds:
-      - |
-        docker run --rm \
-          --name twitchets \
-          -p 5656:5656 \
-          arranhs/twitchets
+      - pnpm run dev
+
+  docker:build:
+    cmds:
+      - docker compose build
+
+  docker:run:
+    cmds:
+      - docker compose up --build

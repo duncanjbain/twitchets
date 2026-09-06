@@ -4,7 +4,16 @@
 package config
 
 import (
+	"bytes"
+	"compress/gzip"
+	"encoding/base64"
+	"fmt"
+	"net/url"
+	"path"
+	"strings"
+
 	"github.com/ahobsonsayers/twigots"
+	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/orsinium-labs/enum"
 )
 
@@ -21,8 +30,8 @@ var (
 
 // Config defines model for Config.
 type Config struct {
-	// APIKey REQUIRED: See README.md for details on how to obtain
-	APIKey string `json:"apiKey"`
+	// KeysUrl URL of Twickets keys.json
+	KeysUrl string `json:"keysUrl"`
 
 	// Country Country code.
 	// Currently only GB is supported.
@@ -87,6 +96,9 @@ type NotificationConfig struct {
 // NotificationType defines model for NotificationType.
 type NotificationType enum.Member[string]
 
+// Notifications defines model for Notifications.
+type Notifications []NotificationType
+
 // NtfyConfig defines model for NtfyConfig.
 type NtfyConfig struct {
 	// Url You can use the public instance at https://ntfy.sh
@@ -95,11 +107,11 @@ type NtfyConfig struct {
 	// Topic If using https://ntfy.sh, make sure this is unique to you!
 	Topic string `json:"topic"`
 
-	// Username Optional: for authenticated instances
-	Username string `json:"username"`
+	// Username Username for authenticated instances (Optional)
+	Username string `json:"username,omitempty"`
 
-	// Password Optional: for authenticated instances
-	Password string `json:"password"`
+	// Password Password for authenticated instances (Optional)
+	Password string `json:"password,omitempty"`
 }
 
 // Region Region code.
@@ -117,6 +129,9 @@ type NtfyConfig struct {
 // - GBWA: Wales
 // - GBNI: Northern Ireland
 type Region = twigots.Region
+
+// Regions defines model for Regions.
+type Regions []Region
 
 // TelegramConfig defines model for TelegramConfig.
 type TelegramConfig struct {
@@ -143,7 +158,7 @@ type TicketListingConfig struct {
 
 	// Regions Geographic regions to search for tickets
 	// Overrides global setting. To reset to default (all regions), use an empty array [].
-	Regions []Region `json:"regions,omitempty"`
+	Regions Regions `json:"regions,omitzero"`
 
 	// NumTickets Number of tickets required in listing
 	// Overrides global setting. To reset to default (any number), use -1.
@@ -159,5 +174,111 @@ type TicketListingConfig struct {
 
 	// Notification Notification services to use
 	// Overrides global setting. To reset to default (all configured services), use an empty array [].
-	Notification []NotificationType `json:"notification,omitempty"`
+	Notification Notifications `json:"notification,omitzero"`
+}
+
+// Base64 encoded, gzipped, json marshaled Swagger object
+var swaggerSpec = []string{
+
+	"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",
+}
+
+// GetSwagger returns the content of the embedded swagger specification file
+// or error if failed to decode
+func decodeSpec() ([]byte, error) {
+	zipped, err := base64.StdEncoding.DecodeString(strings.Join(swaggerSpec, ""))
+	if err != nil {
+		return nil, fmt.Errorf("error base64 decoding spec: %w", err)
+	}
+	zr, err := gzip.NewReader(bytes.NewReader(zipped))
+	if err != nil {
+		return nil, fmt.Errorf("error decompressing spec: %w", err)
+	}
+	var buf bytes.Buffer
+	_, err = buf.ReadFrom(zr)
+	if err != nil {
+		return nil, fmt.Errorf("error decompressing spec: %w", err)
+	}
+
+	return buf.Bytes(), nil
+}
+
+var rawSpec = decodeSpecCached()
+
+// a naive cached of a decoded swagger spec
+func decodeSpecCached() func() ([]byte, error) {
+	data, err := decodeSpec()
+	return func() ([]byte, error) {
+		return data, err
+	}
+}
+
+// Constructs a synthetic filesystem for resolving external references when loading openapi specifications.
+func PathToRawSpec(pathToFile string) map[string]func() ([]byte, error) {
+	res := make(map[string]func() ([]byte, error))
+	if len(pathToFile) > 0 {
+		res[pathToFile] = rawSpec
+	}
+
+	return res
+}
+
+// GetSwagger returns the Swagger specification corresponding to the generated code
+// in this file. The external references of Swagger specification are resolved.
+// The logic of resolving external references is tightly connected to "import-mapping" feature.
+// Externally referenced files must be embedded in the corresponding golang packages.
+// Urls can be supported but this task was out of the scope.
+func GetSwagger() (swagger *openapi3.T, err error) {
+	resolvePath := PathToRawSpec("")
+
+	loader := openapi3.NewLoader()
+	loader.IsExternalRefsAllowed = true
+	loader.ReadFromURIFunc = func(loader *openapi3.Loader, url *url.URL) ([]byte, error) {
+		pathToFile := url.String()
+		pathToFile = path.Clean(pathToFile)
+		getSpec, ok := resolvePath[pathToFile]
+		if !ok {
+			err1 := fmt.Errorf("path not found: %s", pathToFile)
+			return nil, err1
+		}
+		return getSpec()
+	}
+	var specData []byte
+	specData, err = rawSpec()
+	if err != nil {
+		return
+	}
+	swagger, err = loader.LoadFromData(specData)
+	if err != nil {
+		return
+	}
+	return
 }

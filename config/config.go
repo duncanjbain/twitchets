@@ -7,9 +7,11 @@ import (
 	"github.com/ahobsonsayers/twigots"
 )
 
+func (r Regions) IsZero() bool { return r == nil }
+
 func (c Config) Validate() error {
-	if c.APIKey == "" {
-		return errors.New("api key must be set")
+	if c.KeysUrl == "" {
+		return errors.New("keys url must be set")
 	}
 
 	if c.Country.Value == "" {

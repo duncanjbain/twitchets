@@ -1,0 +1,11 @@
+# Ignore certain directories
+.git/
+.github/
+assets/
+**/bin/
+**/dist/
+**/node_modules/
+
+# Ignore certain files
+Dockerfile
+README.md

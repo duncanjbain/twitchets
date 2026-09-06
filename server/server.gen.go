@@ -4,12 +4,19 @@
 package server
 
 import (
+	"bytes"
+	"compress/gzip"
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/url"
+	"path"
+	"strings"
 
 	externalRef0 "github.com/ahobsonsayers/twitchets/config"
+	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/go-chi/chi/v5"
 	strictnethttp "github.com/oapi-codegen/runtime/strictmiddleware/nethttp"
 )
@@ -54,6 +61,7 @@ type MiddlewareFunc func(http.Handler) http.Handler
 
 // GetConfig operation middleware
 func (siw *ServerInterfaceWrapper) GetConfig(w http.ResponseWriter, r *http.Request) {
+
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.GetConfig(w, r)
 	}))
@@ -67,6 +75,7 @@ func (siw *ServerInterfaceWrapper) GetConfig(w http.ResponseWriter, r *http.Requ
 
 // PutConfig operation middleware
 func (siw *ServerInterfaceWrapper) PutConfig(w http.ResponseWriter, r *http.Request) {
+
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.PutConfig(w, r)
 	}))
@@ -201,7 +210,8 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	return r
 }
 
-type GetConfigRequestObject struct{}
+type GetConfigRequestObject struct {
+}
 
 type GetConfigResponseObject interface {
 	VisitGetConfigResponse(w http.ResponseWriter) error
@@ -216,7 +226,8 @@ func (response GetConfig200JSONResponse) VisitGetConfigResponse(w http.ResponseW
 	return json.NewEncoder(w).Encode(response)
 }
 
-type GetConfig500Response struct{}
+type GetConfig500Response struct {
+}
 
 func (response GetConfig500Response) VisitGetConfigResponse(w http.ResponseWriter) error {
 	w.WriteHeader(500)
@@ -231,21 +242,24 @@ type PutConfigResponseObject interface {
 	VisitPutConfigResponse(w http.ResponseWriter) error
 }
 
-type PutConfig200Response struct{}
+type PutConfig200Response struct {
+}
 
 func (response PutConfig200Response) VisitPutConfigResponse(w http.ResponseWriter) error {
 	w.WriteHeader(200)
 	return nil
 }
 
-type PutConfig400Response struct{}
+type PutConfig400Response struct {
+}
 
 func (response PutConfig400Response) VisitPutConfigResponse(w http.ResponseWriter) error {
 	w.WriteHeader(400)
 	return nil
 }
 
-type PutConfig500Response struct{}
+type PutConfig500Response struct {
+}
 
 func (response PutConfig500Response) VisitPutConfigResponse(w http.ResponseWriter) error {
 	w.WriteHeader(500)
@@ -262,10 +276,8 @@ type StrictServerInterface interface {
 	PutConfig(ctx context.Context, request PutConfigRequestObject) (PutConfigResponseObject, error)
 }
 
-type (
-	StrictHandlerFunc    = strictnethttp.StrictHTTPHandlerFunc
-	StrictMiddlewareFunc = strictnethttp.StrictHTTPMiddlewareFunc
-)
+type StrictHandlerFunc = strictnethttp.StrictHTTPHandlerFunc
+type StrictMiddlewareFunc = strictnethttp.StrictHTTPMiddlewareFunc
 
 type StrictHTTPServerOptions struct {
 	RequestErrorHandlerFunc  func(w http.ResponseWriter, r *http.Request, err error)
@@ -346,4 +358,120 @@ func (sh *strictHandler) PutConfig(w http.ResponseWriter, r *http.Request) {
 	} else if response != nil {
 		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
 	}
+}
+
+// Base64 encoded, gzipped, json marshaled Swagger object
+var swaggerSpec = []string{
+
+	"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",
+	"vr/K43OpTfLr4NcBWd4v/xcAAP//iYMub1EdAAA=",
+}
+
+// GetSwagger returns the content of the embedded swagger specification file
+// or error if failed to decode
+func decodeSpec() ([]byte, error) {
+	zipped, err := base64.StdEncoding.DecodeString(strings.Join(swaggerSpec, ""))
+	if err != nil {
+		return nil, fmt.Errorf("error base64 decoding spec: %w", err)
+	}
+	zr, err := gzip.NewReader(bytes.NewReader(zipped))
+	if err != nil {
+		return nil, fmt.Errorf("error decompressing spec: %w", err)
+	}
+	var buf bytes.Buffer
+	_, err = buf.ReadFrom(zr)
+	if err != nil {
+		return nil, fmt.Errorf("error decompressing spec: %w", err)
+	}
+
+	return buf.Bytes(), nil
+}
+
+var rawSpec = decodeSpecCached()
+
+// a naive cached of a decoded swagger spec
+func decodeSpecCached() func() ([]byte, error) {
+	data, err := decodeSpec()
+	return func() ([]byte, error) {
+		return data, err
+	}
+}
+
+// Constructs a synthetic filesystem for resolving external references when loading openapi specifications.
+func PathToRawSpec(pathToFile string) map[string]func() ([]byte, error) {
+	res := make(map[string]func() ([]byte, error))
+	if len(pathToFile) > 0 {
+		res[pathToFile] = rawSpec
+	}
+
+	for rawPath, rawFunc := range externalRef0.PathToRawSpec(path.Join(path.Dir(pathToFile), "./models.openapi.yaml")) {
+		if _, ok := res[rawPath]; ok {
+			// it is not possible to compare functions in golang, so always overwrite the old value
+		}
+		res[rawPath] = rawFunc
+	}
+	return res
+}
+
+// GetSwagger returns the Swagger specification corresponding to the generated code
+// in this file. The external references of Swagger specification are resolved.
+// The logic of resolving external references is tightly connected to "import-mapping" feature.
+// Externally referenced files must be embedded in the corresponding golang packages.
+// Urls can be supported but this task was out of the scope.
+func GetSwagger() (swagger *openapi3.T, err error) {
+	resolvePath := PathToRawSpec("")
+
+	loader := openapi3.NewLoader()
+	loader.IsExternalRefsAllowed = true
+	loader.ReadFromURIFunc = func(loader *openapi3.Loader, url *url.URL) ([]byte, error) {
+		pathToFile := url.String()
+		pathToFile = path.Clean(pathToFile)
+		getSpec, ok := resolvePath[pathToFile]
+		if !ok {
+			err1 := fmt.Errorf("path not found: %s", pathToFile)
+			return nil, err1
+		}
+		return getSpec()
+	}
+	var specData []byte
+	specData, err = rawSpec()
+	if err != nil {
+		return
+	}
+	swagger, err = loader.LoadFromData(specData)
+	if err != nil {
+		return
+	}
+	return
 }

@@ -5,11 +5,13 @@ on:
     branches:
       - main
 
-env:
-  CI: true
-
 jobs:
-  lint-test:
-    name: Lint and Test
-    uses: ./.github/workflows/lint-test.yaml
+  lint:
+    name: Lint
+    uses: ./.github/workflows/lint.yaml
+    secrets: inherit
+
+  test:
+    name: Test
+    uses: ./.github/workflows/test.yaml
     secrets: inherit
